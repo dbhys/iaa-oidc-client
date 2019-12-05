@@ -1,0 +1,4 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  com.dbhys.iaa.config.AuthenticationResourceServerConfig,\
+  com.dbhys.iaa.bean.AuthenticationBeanFactory,\
+  com.dbhys.iaa.security.ApiSecurityInterceptor
