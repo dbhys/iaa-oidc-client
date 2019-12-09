@@ -1,6 +1,8 @@
 package com.dbhys.iaa.bean;
 
-import com.dbhys.iaa.config.AuthenticationResourceServerConfig;
+import com.dbhys.iaa.builder.OidcAuthorizeBasicUrlBuilder;
+import com.dbhys.iaa.config.OidcConfig;
+import com.dbhys.iaa.validator.AuthenticationTokenValidator;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.source.DefaultJWKSetCache;
 import com.nimbusds.jose.jwk.source.JWKSetCache;
@@ -14,7 +16,6 @@ import com.nimbusds.oauth2.sdk.GeneralException;
 import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.id.Issuer;
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
-import com.dbhys.iaa.validator.AuthenticationTokenValidator;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 public class AuthenticationBeanFactory implements ApplicationContextAware, InitializingBean {
 
     @Autowired
-    private AuthenticationResourceServerConfig config;
+    private OidcConfig config;
 
     private ApplicationContext applicationContext;
 
@@ -61,15 +62,18 @@ public class AuthenticationBeanFactory implements ApplicationContextAware, Initi
             JWKSetCache jwkSetCache = new DefaultJWKSetCache(config.getLifeSpan(), TimeUnit.HOURS);
             ResourceRetriever resourceRetriever = new DefaultResourceRetriever(this.config.getConnectTimeout(), this.config.getReadTimeout());
             JWKSource jwkSource = new RemoteJWKSet(this.oidcProviderMetadata.getJWKSetURI().toURL(), resourceRetriever, jwkSetCache);
-            JWSKeySelector jwsKeySelector = new JWSVerificationKeySelector(JWSAlgorithm.RS256, jwkSource);
+
+            JWSKeySelector jwsKeySelector = new JWSVerificationKeySelector(oidcProviderMetadata.getTokenEndpointJWSAlgs().get(0), jwkSource);
             AuthenticationTokenValidator authenticationTokenValidator = new AuthenticationTokenValidator(new Issuer(this.config.getIssuer()), new ClientID(this.config.getClientId()), jwsKeySelector, null);
 
+            OidcAuthorizeBasicUrlBuilder oidcAuthorizeBasicUrlBuilder = new OidcAuthorizeBasicUrlBuilder(config, oidcProviderMetadata);
             configurableListableBeanFactory.registerSingleton("oidcProviderMetadata", oidcProviderMetadata);
             configurableListableBeanFactory.registerSingleton("jwkSetCache", jwkSetCache);
             configurableListableBeanFactory.registerSingleton("resourceRetriever", resourceRetriever);
             configurableListableBeanFactory.registerSingleton("jwkSource", jwkSource);
             configurableListableBeanFactory.registerSingleton("jwsKeySelector", jwsKeySelector);
             configurableListableBeanFactory.registerSingleton("authenticationTokenValidator", authenticationTokenValidator);
+            configurableListableBeanFactory.registerSingleton("oidcAuthorizeBasicUrlBuilder", oidcAuthorizeBasicUrlBuilder);
         } catch (GeneralException e) {
             e.printStackTrace();
             throw new Error("Init authentication config and resource error.");

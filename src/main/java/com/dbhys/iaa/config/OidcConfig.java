@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 @ConfigurationProperties("dbhys.oidc")
-public class AuthenticationResourceServerConfig {
+public class OidcConfig {
 
     /**
      * The default lifespan for cached JWK sets (5 minutes).
@@ -32,7 +32,13 @@ public class AuthenticationResourceServerConfig {
 
     private String clientId;
 
-    private String scope;
+    private String clientSecret;
+
+    private String[] scope = new String[]{"openid", "profile"};
+
+    private String[] responseType = new String[]{"code"};
+
+    private String[] redirectUri;
 
     private Long lifeSpan = DEFAULT_LIFESPAN_HOUR;
 
@@ -58,12 +64,36 @@ public class AuthenticationResourceServerConfig {
         this.clientId = clientId;
     }
 
-    public String getScope() {
+    public String[] getScope() {
         return scope;
     }
 
-    public void setScope(String scope) {
+    public void setScope(String[] scope) {
         this.scope = scope;
+    }
+
+    public String getClientSecret() {
+        return clientSecret;
+    }
+
+    public void setClientSecret(String clientSecret) {
+        this.clientSecret = clientSecret;
+    }
+
+    public String[] getResponseType() {
+        return responseType;
+    }
+
+    public void setResponseType(String[] responseType) {
+        this.responseType = responseType;
+    }
+
+    public String[] getRedirectUri() {
+        return redirectUri;
+    }
+
+    public void setRedirectUri(String[] redirectUri) {
+        this.redirectUri = redirectUri;
     }
 
     public Long getLifeSpan() {

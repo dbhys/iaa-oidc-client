@@ -1,5 +1,6 @@
 package com.dbhys.iaa.security;
 
+import com.dbhys.iaa.builder.OidcAuthorizeBasicUrlBuilder;
 import com.dbhys.iaa.http.HttpHeader;
 import com.dbhys.iaa.http.HttpMethod;
 import com.dbhys.iaa.http.MediaType;
@@ -19,6 +20,8 @@ import org.springframework.web.servlet.ModelAndView;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by Milas on 2019/3/14.
@@ -39,6 +42,7 @@ public class ApiSecurityInterceptor implements ApplicationContextAware, HandlerI
         }
 
         final String authenticationHeader = request.getHeader(AUTHENTICATION_HEADER);
+        Map<String, String> errorInfo = null;
         if (authenticationHeader != null && authenticationHeader.toUpperCase().startsWith(BEARER)) {
             final String token = authenticationHeader.substring(7);
 
@@ -48,20 +52,29 @@ public class ApiSecurityInterceptor implements ApplicationContextAware, HandlerI
                 AuthenticationHelper.setAuthentication(new Authentication(idTokenClaimsSet.getSubject().getValue()));
                 return true;
             } catch (Exception e) {
-                logger.error("Invalid token: " + authenticationHeader);
-                e.printStackTrace();
+                logger.error("Invalid token: " + authenticationHeader, e);
+                errorInfo = new HashMap();
+                errorInfo.put("error", "invalid_token");
+                errorInfo.put("error_description", "Invalid token!");
                 response.setStatus(HttpStatus.FORBIDDEN.value());
-                responseError(request, response, "invalid_token", "Invalid token!");
             }
         } else {
+            errorInfo = new HashMap();
+            errorInfo.put("error", "login_required");
+            errorInfo.put("error_description", "You should login at first!");
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
-            responseError(request, response, "login_required", "You should login at first!");
         }
+        String state = request.getParameter("state");
+        if (state != null) {
+            errorInfo.put("state", state);
+        }
+        OidcAuthorizeBasicUrlBuilder oidcAuthorizeBasicUrlBuilder = applicationContext.getBean(OidcAuthorizeBasicUrlBuilder.class);
+        errorInfo.put("error_uri", oidcAuthorizeBasicUrlBuilder.build(state, null, null));
+        responseError(request, response, errorInfo);
         return false;
     }
 
-    private void responseError(HttpServletRequest request, HttpServletResponse response,
-                               String error, String errorDescription) throws IOException {
+    private void responseError(HttpServletRequest request, HttpServletResponse response, Map<String, String> errorInfo) throws IOException {
         String acceptMediaType = request.getHeader(HttpHeader.ACCEPT);
         if (acceptMediaType == null || acceptMediaType.trim() == "" || acceptMediaType.contains(MediaType.ALL_VALUE)) {
             acceptMediaType = request.getHeader(HttpHeader.CONTENT_TYPE);
@@ -72,13 +85,13 @@ public class ApiSecurityInterceptor implements ApplicationContextAware, HandlerI
 
         response.resetBuffer();
         if (acceptMediaType.contains(MediaType.APPLICATION_JSON_VALUE) || acceptMediaType.contains(MediaType.APPLICATION_FORM_URLENCODED_VALUE)) {
-            response.getWriter().write(toJson(error, errorDescription));
+            response.getWriter().write(toJson(errorInfo));
         } else if (acceptMediaType.contains(MediaType.APPLICATION_XML_VALUE)) {
-            response.getWriter().write(toXml(error, errorDescription));
+            response.getWriter().write(toXml(errorInfo));
         } else if (acceptMediaType.contains("text/")) {
-            response.getWriter().write(toText(error, errorDescription));
+            response.getWriter().write(toText(errorInfo));
         } else {
-            response.setHeader(HttpHeader.WWW_AUTHENTICATE, toText(error, errorDescription));
+            response.setHeader(HttpHeader.WWW_AUTHENTICATE, toText(errorInfo));
         }
         try {
             response.flushBuffer();
@@ -98,20 +111,44 @@ public class ApiSecurityInterceptor implements ApplicationContextAware, HandlerI
 
     }
 
-    private String toJson(String error, String errorDescription) {
-        return "{\"error\": \"" + error + "\",\"error_description\" : \"" + errorDescription + "\"}";
+    private String toJson(Map<String, String> errorInfo) {
+        StringBuffer sb = new StringBuffer("{");
+        int i = 0;
+        for(String key : errorInfo.keySet()){
+            if (i == 0) {
+                i++;
+            } else {
+                sb.append(",");
+            }
+            sb.append("\"").append(key).append("\": \"").append(errorInfo.get(key)).append("\"");
+        }
+        return sb.append("}").toString();
     }
 
     /*private String toHtml(String error, String errorDescription) {
         return "{\"error\": \"" + error + "\",\"error_description\" : \"" + errorDescription + "\"}";
     }*/
 
-    private String toXml(String error, String errorDescription) {
-        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><error>" + error + "</error><error_description>" + errorDescription + "</error_description>";
+    private String toXml(Map<String, String> errorInfo) {
+        StringBuffer sb = new StringBuffer("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+        for(String key : errorInfo.keySet()){
+            sb.append("<").append(key).append(">").append(errorInfo.get(key)).append("<").append(key).append(">");
+        }
+        return sb.toString();
     }
 
-    private String toText(String error, String errorDescription) {
-        return "error=\"" + error + "\", error_description=\"" + errorDescription + "\"";
+    private String toText(Map<String, String> errorInfo) {
+        StringBuffer sb = new StringBuffer();
+        int i = 0;
+        for(String key : errorInfo.keySet()){
+            if (i == 0) {
+                i++;
+            } else {
+                sb.append(",");
+            }
+            sb.append(key).append("=").append("\"").append(errorInfo.get(key)).append("\"");
+        }
+        return sb.toString();
     }
 
     @Override
