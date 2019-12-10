@@ -2,8 +2,8 @@ package com.dbhys.iaa.bean;
 
 import com.dbhys.iaa.builder.OidcAuthorizeBasicUrlBuilder;
 import com.dbhys.iaa.config.OidcConfig;
-import com.dbhys.iaa.validator.AuthenticationTokenValidator;
-import com.nimbusds.jose.JWSAlgorithm;
+import com.dbhys.iaa.validator.IdTokenValidatorForClient;
+import com.dbhys.iaa.validator.IdTokenValidatorForRs;
 import com.nimbusds.jose.jwk.source.DefaultJWKSetCache;
 import com.nimbusds.jose.jwk.source.JWKSetCache;
 import com.nimbusds.jose.jwk.source.JWKSource;
@@ -24,6 +24,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -48,7 +49,7 @@ public class AuthenticationBeanFactory implements ApplicationContextAware, Initi
 
     @Override
     public void afterPropertiesSet() throws Exception {
-        if (config == null || config.getIssuer() == null) {
+        if (config == null || StringUtils.isEmpty(config.getIssuer())) {
             throw new Error("Resource server config and property 'issuer' can't be null!");
         }
         try {
@@ -64,16 +65,22 @@ public class AuthenticationBeanFactory implements ApplicationContextAware, Initi
             JWKSource jwkSource = new RemoteJWKSet(this.oidcProviderMetadata.getJWKSetURI().toURL(), resourceRetriever, jwkSetCache);
 
             JWSKeySelector jwsKeySelector = new JWSVerificationKeySelector(oidcProviderMetadata.getTokenEndpointJWSAlgs().get(0), jwkSource);
-            AuthenticationTokenValidator authenticationTokenValidator = new AuthenticationTokenValidator(new Issuer(this.config.getIssuer()), new ClientID(this.config.getClientId()), jwsKeySelector, null);
 
-            OidcAuthorizeBasicUrlBuilder oidcAuthorizeBasicUrlBuilder = new OidcAuthorizeBasicUrlBuilder(config, oidcProviderMetadata);
+            IdTokenValidatorForRs idTokenValidatorForRs = new IdTokenValidatorForRs(new Issuer(this.config.getIssuer()), jwsKeySelector, null);
+
             configurableListableBeanFactory.registerSingleton("oidcProviderMetadata", oidcProviderMetadata);
             configurableListableBeanFactory.registerSingleton("jwkSetCache", jwkSetCache);
             configurableListableBeanFactory.registerSingleton("resourceRetriever", resourceRetriever);
             configurableListableBeanFactory.registerSingleton("jwkSource", jwkSource);
             configurableListableBeanFactory.registerSingleton("jwsKeySelector", jwsKeySelector);
-            configurableListableBeanFactory.registerSingleton("authenticationTokenValidator", authenticationTokenValidator);
-            configurableListableBeanFactory.registerSingleton("oidcAuthorizeBasicUrlBuilder", oidcAuthorizeBasicUrlBuilder);
+            configurableListableBeanFactory.registerSingleton("idTokenValidatorForRs", idTokenValidatorForRs);
+            if (!StringUtils.isEmpty(config.getClientId()) && !StringUtils.isEmpty(config.getClientSecret())){
+                IdTokenValidatorForClient idTokenValidatorForClient = new IdTokenValidatorForClient(new Issuer(this.config.getIssuer()), new ClientID(this.config.getClientId()), jwsKeySelector, null);
+                configurableListableBeanFactory.registerSingleton("idTokenValidatorForClient", idTokenValidatorForClient);
+                OidcAuthorizeBasicUrlBuilder oidcAuthorizeBasicUrlBuilder = new OidcAuthorizeBasicUrlBuilder(config, oidcProviderMetadata);
+                configurableListableBeanFactory.registerSingleton("oidcAuthorizeBasicUrlBuilder", oidcAuthorizeBasicUrlBuilder);
+
+            }
         } catch (GeneralException e) {
             e.printStackTrace();
             throw new Error("Init authentication config and resource error.");

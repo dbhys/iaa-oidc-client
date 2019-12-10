@@ -4,10 +4,11 @@ import com.dbhys.iaa.builder.OidcAuthorizeBasicUrlBuilder;
 import com.dbhys.iaa.http.HttpHeader;
 import com.dbhys.iaa.http.HttpMethod;
 import com.dbhys.iaa.http.MediaType;
+import com.dbhys.iaa.validator.IdTokenValidatorForClient;
+import com.dbhys.iaa.validator.IdTokenValidatorForRs;
 import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet;
 import com.dbhys.iaa.http.HttpStatus;
-import com.dbhys.iaa.validator.AuthenticationTokenValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
@@ -47,7 +48,7 @@ public class ApiSecurityInterceptor implements ApplicationContextAware, HandlerI
             final String token = authenticationHeader.substring(7);
 
             try {
-                AuthenticationTokenValidator validator = applicationContext.getBean(AuthenticationTokenValidator.class);
+                IdTokenValidatorForRs validator = applicationContext.getBean(IdTokenValidatorForRs.class);
                 IDTokenClaimsSet idTokenClaimsSet = validator.validate(SignedJWT.parse(token), null);
                 AuthenticationHelper.setAuthentication(new Authentication(idTokenClaimsSet.getSubject().getValue()));
                 return true;
@@ -68,8 +69,11 @@ public class ApiSecurityInterceptor implements ApplicationContextAware, HandlerI
         if (state != null) {
             errorInfo.put("state", state);
         }
+
         OidcAuthorizeBasicUrlBuilder oidcAuthorizeBasicUrlBuilder = applicationContext.getBean(OidcAuthorizeBasicUrlBuilder.class);
-        errorInfo.put("error_uri", oidcAuthorizeBasicUrlBuilder.build(state, null, null));
+        if(oidcAuthorizeBasicUrlBuilder != null) {
+            errorInfo.put("error_uri", oidcAuthorizeBasicUrlBuilder.build(state, null, null));
+        }
         responseError(request, response, errorInfo);
         return false;
     }
