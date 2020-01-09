@@ -66,20 +66,20 @@ public class AuthenticationBeanFactory implements ApplicationContextAware, Initi
 
             JWSKeySelector jwsKeySelector = new JWSVerificationKeySelector(oidcProviderMetadata.getTokenEndpointJWSAlgs().get(0), jwkSource);
 
-            IdTokenValidatorForRs idTokenValidatorForRs = new IdTokenValidatorForRs(new Issuer(this.config.getIssuer()), jwsKeySelector, null);
 
             configurableListableBeanFactory.registerSingleton("oidcProviderMetadata", oidcProviderMetadata);
             configurableListableBeanFactory.registerSingleton("jwkSetCache", jwkSetCache);
             configurableListableBeanFactory.registerSingleton("resourceRetriever", resourceRetriever);
             configurableListableBeanFactory.registerSingleton("jwkSource", jwkSource);
             configurableListableBeanFactory.registerSingleton("jwsKeySelector", jwsKeySelector);
-            configurableListableBeanFactory.registerSingleton("idTokenValidatorForRs", idTokenValidatorForRs);
             if (!StringUtils.isEmpty(config.getClientId()) && !StringUtils.isEmpty(config.getClientSecret())){
                 IdTokenValidatorForClient idTokenValidatorForClient = new IdTokenValidatorForClient(new Issuer(this.config.getIssuer()), new ClientID(this.config.getClientId()), jwsKeySelector, null);
                 configurableListableBeanFactory.registerSingleton("idTokenValidatorForClient", idTokenValidatorForClient);
                 OidcAuthorizeBasicUrlBuilder oidcAuthorizeBasicUrlBuilder = new OidcAuthorizeBasicUrlBuilder(config, oidcProviderMetadata);
                 configurableListableBeanFactory.registerSingleton("oidcAuthorizeBasicUrlBuilder", oidcAuthorizeBasicUrlBuilder);
-
+            } else {
+                IdTokenValidatorForRs idTokenValidatorForRs = new IdTokenValidatorForRs(new Issuer(this.config.getIssuer()), jwsKeySelector, null);
+                configurableListableBeanFactory.registerSingleton("idTokenValidatorForRs", idTokenValidatorForRs);
             }
         } catch (GeneralException e) {
             e.printStackTrace();

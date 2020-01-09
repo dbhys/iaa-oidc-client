@@ -1,6 +1,7 @@
 package com.dbhys.iaa.security;
 
 import com.dbhys.iaa.builder.OidcAuthorizeBasicUrlBuilder;
+import com.dbhys.iaa.config.OidcConfig;
 import com.dbhys.iaa.http.HttpHeader;
 import com.dbhys.iaa.http.HttpMethod;
 import com.dbhys.iaa.http.MediaType;
@@ -12,9 +13,11 @@ import com.dbhys.iaa.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 
@@ -36,21 +39,34 @@ public class ApiSecurityInterceptor implements ApplicationContextAware, HandlerI
 
     private ApplicationContext applicationContext;
 
+    @Autowired
+    private OidcConfig config;
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         if (request.getMethod().toUpperCase().equals(HttpMethod.OPTIONS.name())) {
             return true;
         }
-
+        String state = request.getParameter("state");
         final String authenticationHeader = request.getHeader(AUTHENTICATION_HEADER);
         Map<String, String> errorInfo = null;
         if (authenticationHeader != null && authenticationHeader.toUpperCase().startsWith(BEARER)) {
             final String token = authenticationHeader.substring(7);
 
             try {
-                IdTokenValidatorForRs validator = applicationContext.getBean(IdTokenValidatorForRs.class);
-                IDTokenClaimsSet idTokenClaimsSet = validator.validate(SignedJWT.parse(token), null);
-                AuthenticationHelper.setAuthentication(new Authentication(idTokenClaimsSet.getSubject().getValue()));
+                if (!StringUtils.isEmpty(config.getClientId()) && !StringUtils.isEmpty(config.getClientSecret())) {
+                    IdTokenValidatorForClient validator = applicationContext.getBean(IdTokenValidatorForClient.class);
+                    IDTokenClaimsSet idTokenClaimsSet = validator.validate(SignedJWT.parse(token), null);
+                    AuthenticationHelper.setAuthentication(new Authentication(idTokenClaimsSet.getSubject().getValue()));
+                } else {
+                    IdTokenValidatorForRs validator = applicationContext.getBean(IdTokenValidatorForRs.class);
+                    IDTokenClaimsSet idTokenClaimsSet = validator.validate(SignedJWT.parse(token), null);
+                    AuthenticationHelper.setAuthentication(new Authentication(idTokenClaimsSet.getSubject().getValue()));
+                }
+                OidcAuthorizeBasicUrlBuilder oidcAuthorizeBasicUrlBuilder = applicationContext.getBean(OidcAuthorizeBasicUrlBuilder.class);
+                if(oidcAuthorizeBasicUrlBuilder != null) {
+                    errorInfo.put("error_uri", oidcAuthorizeBasicUrlBuilder.build(state, null, null));
+                }
                 return true;
             } catch (Exception e) {
                 logger.error("Invalid token: " + authenticationHeader, e);
@@ -65,15 +81,10 @@ public class ApiSecurityInterceptor implements ApplicationContextAware, HandlerI
             errorInfo.put("error_description", "You should login at first!");
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
         }
-        String state = request.getParameter("state");
         if (state != null) {
             errorInfo.put("state", state);
         }
 
-        OidcAuthorizeBasicUrlBuilder oidcAuthorizeBasicUrlBuilder = applicationContext.getBean(OidcAuthorizeBasicUrlBuilder.class);
-        if(oidcAuthorizeBasicUrlBuilder != null) {
-            errorInfo.put("error_uri", oidcAuthorizeBasicUrlBuilder.build(state, null, null));
-        }
         responseError(request, response, errorInfo);
         return false;
     }
@@ -86,7 +97,6 @@ public class ApiSecurityInterceptor implements ApplicationContextAware, HandlerI
         if (acceptMediaType == null || acceptMediaType.trim() == "") {
             acceptMediaType = MediaType.APPLICATION_JSON_UTF8_VALUE;
         }
-
         response.resetBuffer();
         if (acceptMediaType.contains(MediaType.APPLICATION_JSON_VALUE) || acceptMediaType.contains(MediaType.APPLICATION_FORM_URLENCODED_VALUE)) {
             response.getWriter().write(toJson(errorInfo));

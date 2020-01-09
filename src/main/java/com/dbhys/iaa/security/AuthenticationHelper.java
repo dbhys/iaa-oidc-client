@@ -17,7 +17,11 @@ public class AuthenticationHelper {
 
     public static Authentication getAuthentication(){
         Authentication authentication = threadLocal.get();
+        if (authentication == null) {
+            logger.error("Current identity is null, Please check ApiSecurityInterceptor configuration is correct.", authentication.getIdentityId());
+            return null;
+        }
         logger.debug("Identity id : {}", authentication.getIdentityId());
-        return threadLocal.get();
+        return authentication;
     }
 }
