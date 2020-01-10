@@ -4,19 +4,19 @@
 
     <groupId>com.dbhys</groupId>
     <artifactId>iaa-oidc-client</artifactId>
-    <version>1.0.0-spring-SNAPSHOT</version>
+    <version>1.0.0-spring</version>
     <packaging>jar</packaging>
 
     <name>iaa-oidc-client</name>
     <description>
         Authentication and authorization sdk for resource server, base framework is spring!
     </description>
-    <url>https://git.dbhys.com/iaa/iaa-oidc-client</url>
+    <url>https://github.com/dbhys/iaa-oidc-client</url>
 
     <scm>
-        <connection>scm:git:git://git.dbhys.com/iaa/iaa-oidc-client.git</connection>
-        <developerConnection>scm:git:https://git.dbhys.com/iaa/iaa-oidc-client.git</developerConnection>
-        <url>https://git.dbhys.com/iaa/iaa-oidc-client.git</url>
+        <connection>scm:git:git://github.com/dbhys/iaa-oidc-client.git</connection>
+        <developerConnection>scm:git:https://github.com/dbhys/iaa-oidc-client.git</developerConnection>
+        <url>https://github.com/dbhys/iaa-oidc-client.git</url>
         <tag>HEAD</tag>
     </scm>
 

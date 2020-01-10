@@ -2,6 +2,7 @@ dbhys:
   oidc:
     issuer: http://iaa.dbhys.local:5556
     client_id: dbhys-com-web
+    client_secret: xxxxxxxx
     scope: openid
     redirect_uri:
       - http://localhost:8080
